@@ -15,7 +15,7 @@ module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] i
     // Exemplos
     inst_mem[0] <= 32'h00000000; // nop
     inst_mem[1] <= 32'h00500113; // addi x2, x0, 5  ok
-    inst_mem[2] <= 32'h00210233; // add  x4, x2, x2  ok
+    //inst_mem[2] <= 32'h00210233; // add  x4, x2, x2  ok
     //inst_mem[1] <= 32'h00202223; // sw x2, 8(x0) ok
     //inst_mem[1] <= 32'h0050a423; // sw x5, 8(x1) ok
     //inst_mem[2] <= 32'h0000a003; // lw x1, x0(0) ok
@@ -121,7 +121,7 @@ module Register_Bank (input clk, regwrite, input [4:0] read_reg1, read_reg2, wri
   
 endmodule
 
-module execute (input [31:0] in1, in2, ImmGen, input alusrc, input [1:0] aluop, input [9:0] funct, output zero, output [31:0] aluout);
+module execute (input [31:0] in1, in2, ImmGen, input alusrc, input [1:0] aluop, input [9:0] funct, output zero, output [31:0] aluout,output [31:0] aluout2);
 
   wire [31:0] alu_B;
   wire [3:0] aluctrl;
@@ -129,7 +129,7 @@ module execute (input [31:0] in1, in2, ImmGen, input alusrc, input [1:0] aluop, 
   assign alu_B = (alusrc) ? ImmGen : in2 ;
 
   //Unidade Lógico Aritimética
-  ALU alu (aluctrl, in1, alu_B, aluout, zero);
+  ALU alu (aluctrl, in1, alu_B, aluout, aluout2, zero);
 
   alucontrol alucontrol (aluop, funct, aluctrl);
 
@@ -154,6 +154,7 @@ module alucontrol (input [1:0] aluop, input [9:0] funct, output reg [3:0] alucon
           6: alucontrol <= 4'd1; // OR
           //39: alucontrol <= 4'd12; // NOR
           7: alucontrol <= 4'd0; // AND
+          8: alucontrol <= 4'd13; //SWAP
           default: alucontrol <= 4'd15; // Nop
         endcase
       end
@@ -161,10 +162,10 @@ module alucontrol (input [1:0] aluop, input [9:0] funct, output reg [3:0] alucon
   end
 endmodule
 
-module ALU (input [3:0] alucontrol, input [31:0] A, B, output reg [31:0] aluout, output zero);
+module ALU (input [3:0] alucontrol, input [31:0] A, B, output reg [31:0] aluout,output reg [31:0] aluout2, output zero);
   
   assign zero = (aluout == 0); // Zero recebe um valor lógico caso aluout seja igual a zero.
-  
+
   always @(alucontrol, A, B) begin
       case (alucontrol)
         0: aluout <= A & B; // AND
@@ -173,12 +174,19 @@ module ALU (input [3:0] alucontrol, input [31:0] A, B, output reg [31:0] aluout,
         6: aluout <= A - B; // SUB
         //7: aluout <= A < B ? 32'd1:32'd0; //SLT
         //12: aluout <= ~(A | B); // NOR
-      default: aluout <= 0; //default 0, Nada acontece;
+        13: begin // SWAP
+          aluout <= B;
+          aluout2 <= A;
+        end
+      default: begin
+        aluout <= 0;
+        aluout2 <= 0;//default 0, Nada acontece;
+      end
     endcase
   end
 endmodule
 
-module memory (input [31:0] address, writedata, input memread, memwrite, clk, output [31:0] readdata);
+module memory (input [31:0] address,input [31:0] address2, writedata, input memread, memwrite, clk, output [31:0] readdata);
 
   integer i;
   reg [31:0] memory [0:127]; 
@@ -197,7 +205,7 @@ module memory (input [31:0] address, writedata, input memread, memwrite, clk, ou
 	end
 endmodule
 
-module writeback (input [31:0] aluout, readdata, input memtoreg, output reg [31:0] write_data);
+module writeback (input [31:0] aluout, input [31:0] aluout2, readdata, input memtoreg, output reg [31:0] write_data);
   always @(memtoreg) begin
     write_data <= (memtoreg) ? readdata : aluout;
   end
@@ -206,7 +214,7 @@ endmodule
 // TOP -------------------------------------------
 module mips (input clk, rst, output [31:0] writedata);
   
-  wire [31:0] inst, sigext, data1, data2, aluout, readdata;
+  wire [31:0] inst, sigext, data1, data2, aluout, aluout2, readdata;
   wire zero, memread, memwrite, memtoreg, branch, alusrc;
   wire [9:0] funct;
   wire [1:0] aluop;
@@ -218,12 +226,12 @@ module mips (input clk, rst, output [31:0] writedata);
   decode decode (inst, writedata, clk, data1, data2, sigext, alusrc, memread, memwrite, memtoreg, branch, aluop, funct);   
   
   // EXECUTE STAGE
-  execute execute (data1, data2, sigext, alusrc, aluop, funct, zero, aluout);
+  execute execute (data1, data2, sigext, alusrc, aluop, funct, zero, aluout, aluout2);
 
   // MEMORY STAGE
-  memory memory (aluout, data2, memread, memwrite, clk, readdata);
+  memory memory (aluout, aluout2, data2, memread, memwrite, clk, readdata);
 
   // WRITEBACK STAGE
-  writeback writeback (aluout, readdata, memtoreg, writedata);
+  writeback writeback (aluout, aluout2, readdata, memtoreg, writedata);
 
 endmodule
