@@ -14,11 +14,11 @@ module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] i
   initial begin
     // Exemplos
     inst_mem[0] <= 32'h00000000; // nop
-    inst_mem[1] <= 32'h00500113; // addi x2, x0, 5  ok
-    inst_mem[2] <= 32'h00210233; // add  x4, x2, x2  ok
-    //inst_mem[1] <= 32'h00202223; // sw x2, 8(x0) ok
+    //inst_mem[1] <= 32'h21C00D; // SWAP X3 X2
+    //inst_mem[2] <= 32'h00210233; // add  x4, x2, x2  ok
+    //inst_mem[1] <= 32'b11111111111100000000000100001110; // sw x2, 8(x0) ok
     //inst_mem[1] <= 32'h0050a423; // sw x5, 8(x1) ok
-    //inst_mem[2] <= 32'h0000a003; // lw x1, x0(0) ok
+    inst_mem[2] <= 32'h0000a003; // lw x1, x0(0) ok
     //inst_mem[1] <= 32'hfff00113; // addi x2,x0,-1 ok
     //inst_mem[2] <= 32'h00318133; // add x2, x3, x3 ok
     //inst_mem[3] <= 32'h40328133; // sub x2, x5, x3 ok
@@ -95,6 +95,17 @@ module ControlUnit (input [6:0] opcode, input [31:0] inst, output reg alusrc, me
         memwrite <= 1;
         ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
       end
+      7'b0001101:begin //swap == 13 TODO
+        alusrc   <= 1;
+        memwrite <= 1;
+        ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
+      end
+      7'b0001110:begin //storeSum == 14
+        alusrc   <= 1;
+        regwrite <= 1;
+        memtoreg <= 1;
+        ImmGen   <= {{20{inst[31]}},inst[31:20]};
+      end
     endcase
   end
 
@@ -151,6 +162,7 @@ module alucontrol (input [1:0] aluop, input [9:0] funct, output reg [3:0] alucon
         case (funct3)
           0: alucontrol <= (funct7 == 0) ? /*ADD*/ 4'd2 : /*SUB*/ 4'd6; 
           2: alucontrol <= 4'd7; // SLT
+          4: alucontrol <= 4'd13; //SWAP
           6: alucontrol <= 4'd1; // OR
           //39: alucontrol <= 4'd12; // NOR
           7: alucontrol <= 4'd0; // AND
@@ -173,6 +185,9 @@ module ALU (input [3:0] alucontrol, input [31:0] A, B, output reg [31:0] aluout,
         6: aluout <= A - B; // SUB
         //7: aluout <= A < B ? 32'd1:32'd0; //SLT
         //12: aluout <= ~(A | B); // NOR
+        13: begin // SWAP
+          aluout <= 0;
+        end
       default: aluout <= 0; //default 0, Nada acontece;
     endcase
   end
