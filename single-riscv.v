@@ -69,7 +69,21 @@ module ControlUnit (input [6:0] opcode, input [31:0] inst, output reg alusrc, me
     aluop    <= 0;
     ImmGen   <= 0; 
     case(opcode) 
-      7'b0110011: begin // R type == 51
+      // testes Jonas e Lais
+      // 7'b0010011: begin // ORI 
+      // memread  <= ?;
+
+			// end
+      // 7'b0010011: begin // SLLI 
+      // 
+			// end
+      // 7'b0110111: begin // LUI 
+
+			// end
+      // 7'b???????: begin // LWI 
+
+			// end
+      7'b0110011: begin // R type == 51 add
         regwrite <= 1;
         aluop    <= 2;
 			end

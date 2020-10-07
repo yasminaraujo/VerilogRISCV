@@ -17,7 +17,6 @@ module bitwise_operators();
         // enviar pro controllunit para marcar leitura e escrita do registrador, or para alu control e os demais comandos que nao sei
         
         // ler o registrador rs1 
-        Register_Bank(input clk, regwrite, input [4:0] read_reg1, read_reg2, writereg, swap, input [31:0] writedata, output [31:0] read_data1, read_data2)
 
         // pegar o immediate do rs1
         
