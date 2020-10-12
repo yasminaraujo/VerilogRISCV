@@ -13,8 +13,23 @@ module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] i
 
   initial begin
     // Exemplos
+    // ORI
+    // inst_mem[0] <= 32'h00000000; // nop
+    // inst_mem[1] <= 32'h106093;   // ori x1, x0, 1
+    // inst_mem[2] <= 32'h20E113;   // ori x2, x1, 2 
+    // inst_mem[3] <= 32'ha36293;   //ori x5, x6, 10
+    // inst_mem[4] <= 32'h546313;   //ori x6, x8, 5
+    // SLLI
+    // inst_mem[0] <= 32'h00000000;  // nop
+    // inst_mem[1] <= 32'h506213;    // ori x4, x0, 5
+    // inst_mem[2] <= 32'h221293;    // slli x5, x4, 2
+    // LUI
+    // inst_mem[0] <= 32'h00000000;  // nop
+    // inst_mem[1] <= 32'h5337;      // lui x6 4
+
     inst_mem[0] <= 32'h00000000; // nop
-    inst_mem[1] <= 32'h00500113; // addi x2, x0, 5  ok
+    inst_mem[1] <= 32'h0054e313; // addi x2, x0, 5  ok
+    // inst_mem[2] <= 32'h0022e313; // addi x2, x0, 5  ok
     //inst_mem[2] <= 32'h00210233; // add  x4, x2, x2  ok
     //inst_mem[1] <= 32'h00202223; // sw x2, 8(x0) ok
     //inst_mem[1] <= 32'h0050a423; // sw x5, 8(x1) ok
@@ -69,20 +84,6 @@ module ControlUnit (input [6:0] opcode, input [31:0] inst, output reg alusrc, me
     aluop    <= 0;
     ImmGen   <= 0; 
     case(opcode) 
-      // testes Jonas e Lais
-      // 7'b0010011: begin // ORI 
-      // memread  <= ?;
-
-			// end
-      // 7'b0010011: begin // SLLI 
-      // 
-			// end
-      // 7'b0110111: begin // LUI 
-
-			// end
-      // 7'b???????: begin // LWI 
-
-			// end
       7'b0110011: begin // R type == 51 add
         regwrite <= 1;
         aluop    <= 2;
@@ -93,6 +94,7 @@ module ControlUnit (input [6:0] opcode, input [31:0] inst, output reg alusrc, me
         ImmGen   <= {{19{inst[31]}},inst[31],inst[7],inst[30:25],inst[11:8],1'b0};
 			end
 			7'b0010011: begin // addi == 19
+        aluop    <= 2;
         alusrc   <= 1;
         regwrite <= 1;
         ImmGen   <= {{20{inst[31]}},inst[31:20]};
@@ -108,6 +110,12 @@ module ControlUnit (input [6:0] opcode, input [31:0] inst, output reg alusrc, me
         alusrc   <= 1;
         memwrite <= 1;
         ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
+      end
+      7'b0110111: begin // lui   
+        alusrc   <= 1;
+        regwrite <= 1;
+        aluop    <= 4;
+        ImmGen   <= {{12{inst[31]}},inst[31:12]};
       end
     endcase
   end
@@ -161,6 +169,7 @@ module alucontrol (input [1:0] aluop, input [9:0] funct, output reg [3:0] alucon
     case (aluop)
       0: alucontrol <= 4'd2; // ADD to SW and LW
       1: alucontrol <= 4'd6; // SUB to branch
+      4: alucontrol <= 4'd10; // SHIFT to LUI
       default: begin
         case (funct3)
           0: alucontrol <= (funct7 == 0) ? /*ADD*/ 4'd2 : /*SUB*/ 4'd6; 
@@ -188,6 +197,7 @@ module ALU (input [3:0] alucontrol, input [31:0] A, B, output reg [31:0] aluout,
         6: aluout <= A - B; // SUB
         //7: aluout <= A < B ? 32'd1:32'd0; //SLT
         //12: aluout <= ~(A | B); // NOR
+        10: aluout <= B << 12; // LUI
         13: begin // SWAP
           aluout <= B;
           aluout2 <= A;
