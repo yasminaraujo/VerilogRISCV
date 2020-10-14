@@ -25,7 +25,7 @@ module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] i
     // inst_mem[2] <= 32'h221293;    // slli x5, x4, 2
     // LUI
     // inst_mem[0] <= 32'h00000000;  // nop
-    // inst_mem[1] <= 32'h5337;      // lui x6 4
+    // inst_mem[1] <= 32'h5337;      // lui x6 4  
 
     inst_mem[0] <= 32'h00000000; // nop
     inst_mem[1] <= 32'h0054e313; // addi x2, x0, 5  ok
