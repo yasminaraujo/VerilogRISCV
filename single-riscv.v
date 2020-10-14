@@ -1,10 +1,10 @@
-module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] inst);
+module fetch (input zero, rst, clk, branch, jump, input [31:0] sigext, output [31:0] inst);
   
   wire [31:0] pc, pc_4, new_pc;
 
   assign pc_4 = 4 + pc; // pc+4  Adder
-  assign new_pc = (branch & zero) ? pc_4 + sigext : pc_4; // new PC Mux
-
+  assign new_pc = (branch & zero) ? pc_4 + sigext : (jump? pc + sigext : pc_4); // new PC Mux
+  
   PC program_counter(new_pc, clk, rst, pc);
 
   reg [31:0] inst_mem [0:31];
@@ -37,9 +37,9 @@ module PC (input [31:0] pc_in, input clk, rst, output reg [31:0] pc_out);
 
 endmodule
 
-module decode (input [31:0] inst, writedata, input clk, output [31:0] data1, data2, ImmGen, output alusrc, memread, memwrite, memtoreg, branch, output [1:0] aluop, output [9:0] funct);
+module decode (input [31:0] inst, writedata, input clk, output [31:0] data1, data2, ImmGen, output alusrc, memread, memwrite, memtoreg, branch, jump,  output [1:0] aluop, output [9:0] funct);
   
-  wire branch, memread, memtoreg, MemWrite, alusrc, regwrite;
+  wire branch, jump, memread, memtoreg, MemWrite, alusrc, regwrite;
   wire [1:0] aluop; 
   wire [4:0] writereg, rs1, rs2, rd;
   wire [6:0] opcode;
@@ -52,13 +52,13 @@ module decode (input [31:0] inst, writedata, input clk, output [31:0] data1, dat
   assign rd     = inst[11:7];
   assign funct = {inst[31:25],inst[14:12]};
 
-  ControlUnit control (opcode, inst, alusrc, memtoreg, regwrite, memread, memwrite, branch, swap, aluop, ImmGen);
+  ControlUnit control (opcode, inst, alusrc, memtoreg, regwrite, memread, memwrite, branch,jump, swap, aluop, ImmGen);
   
   Register_Bank Registers (clk, regwrite, rs1, rs2, rd, swap, writedata, data1, data2); 
 
 endmodule
 
-module ControlUnit (input [6:0] opcode, input [31:0] inst, output reg alusrc, memtoreg, regwrite, memread, memwrite, branch, swap, output reg [1:0] aluop, output reg [31:0] ImmGen);
+module ControlUnit (input [6:0] opcode, input [31:0] inst, output reg alusrc, memtoreg, regwrite, memread, memwrite, branch, jump, swap, output reg [1:0] aluop, output reg [31:0] ImmGen);
 
   always @(opcode) begin
     alusrc   <= 0;
@@ -70,6 +70,7 @@ module ControlUnit (input [6:0] opcode, input [31:0] inst, output reg alusrc, me
     aluop    <= 0;
     ImmGen   <= 0; 
     swap <= 0;
+    jump <=0;
     case(opcode) 
       7'b0110011: begin // R type == 51
         regwrite <= 1;
@@ -94,6 +95,7 @@ module ControlUnit (input [6:0] opcode, input [31:0] inst, output reg alusrc, me
         alusrc   <= 1;
         regwrite <= 1;
         ImmGen   <= {{20{inst[31]}},inst[31:20]};
+        aluop <= 2;
       end
 			7'b0000011: begin // lw == 3
         alusrc   <= 1;
@@ -121,6 +123,16 @@ module ControlUnit (input [6:0] opcode, input [31:0] inst, output reg alusrc, me
         memtoreg <= 1;
         memread  <= 1;
         aluop <= 2;
+      end
+       7'b0110111: begin // lui   
+        alusrc   <= 1;
+        regwrite <= 1;
+        aluop    <= 5;
+        ImmGen   <= {{12{inst[31]}},inst[31:12]};
+      end
+      7'b1101111: begin // jump == 111
+        jump <= 1;
+        ImmGen   <= {{12{inst[31]}},inst[19:12],inst[20],inst[30:21]};
       end
     endcase
   end
@@ -178,13 +190,21 @@ module alucontrol (input [1:0] aluop, input [9:0] funct, output reg [3:0] alucon
     case (aluop)
       0: alucontrol <= 4'd2; // ADD to SW and LW
       1: alucontrol <= 4'd6; // SUB to branch
+      2: begin
+        case(funct3)
+          0: alucontrol <= 4'd2;
+          1: alucontrol <= 4'd12;
+          6: alucontrol <= 4'd1;
+        endcase
+      end
       3: alucontrol <= 4'd8; //SLT to BLT
       4: alucontrol <= 4'd9; //greater or equal BGE
+      5: alucontrol <= 4'd10; // SHIFT to LUI
+
       default: begin
         case (funct3)
           0: alucontrol <= (funct7 == 0) ? /*ADD*/ 4'd2 : /*SUB*/ 4'd6; 
           2: alucontrol <= 4'd7; // SLT
-         // 4: alucontrol <= 4'd13; //SWAP
           6: alucontrol <= 4'd1; // OR
           //39: alucontrol <= 4'd12; // NOR
           7: alucontrol <= 4'd0; // AND
@@ -208,10 +228,7 @@ module ALU (input [3:0] alucontrol, input [31:0] A, B, output reg [31:0] aluout,
         7: aluout <= A < B ? 32'd1:32'd0; //SLT
         8: aluout <= A < B ? 32'd0:32'd1; //Condicional para BLT
         9: aluout <= A >= B ? 32'd0:32'd1;
-        //12: aluout <= ~(A | B); // NOR
-       // 13: begin // SWAP
-          //aluout <= 0;
-        //end
+        12: aluout <= A << B;
       default: aluout <= 0; //default 0, Nada acontece;
     endcase
   end
@@ -246,15 +263,15 @@ endmodule
 module mips (input clk, rst, output [31:0] writedata);
   
   wire [31:0] inst, sigext, data1, data2, aluout, readdata;
-  wire zero, memread, memwrite, memtoreg, branch, alusrc, swap;
+  wire zero, memread, memwrite, memtoreg, branch, jump, alusrc, swap;
   wire [9:0] funct;
   wire [1:0] aluop;
   
   // FETCH STAGE
-  fetch fetch (zero, rst, clk, branch, sigext, inst);
+  fetch fetch (zero, rst, clk, branch, jump, sigext, inst);
   
   // DECODE STAGE
-  decode decode (inst, writedata, clk, data1, data2, sigext, alusrc, memread, memwrite, memtoreg, branch, aluop, funct);   
+  decode decode (inst, writedata, clk, data1, data2, sigext, alusrc, memread, memwrite, memtoreg, branch, jump, aluop, funct);   
   
   // EXECUTE STAGE
   execute execute (data1, data2, sigext, alusrc, aluop, funct, zero, aluout);
