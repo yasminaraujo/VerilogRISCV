@@ -19,10 +19,27 @@ module fetch (input zero, rst, clk, branch, jump, input [31:0] sigext, output [3
 	//inst_mem[1] <= 32'b11111111111100000000000100001110; // storeSum
 	  //inst_mem[1] <= 32'b00000000001100010000000000001111; // lwi  ok
 	  //inst_mem[1] <= 32'b00000000001000000000000000001101; //swap x0 x1
-    //inst_mem[2] <= 32'h0000a003; // lw x1, x0(0) ok
-    //inst_mem[1] <= 32'hfff00113; // addi x2,x0,-1 ok
-    //inst_mem[2] <= 32'h00318133; // add x2, x3, x3 ok
-    //inst_mem[3] <= 32'h40328133; // sub x2, x5, x3 ok
+	 	//inst_mem[2] <= 32'h0000a003; // lw x1, x0(0) ok
+	    //inst_mem[1] <= 32'hfff00113; // addi x2,x0,-1 ok
+	    //inst_mem[2] <= 32'h00318133; // add x2, x3, x3 ok
+	    //inst_mem[3] <= 32'h40328133; // sub x2, x5, x3 ok
+		  // inst_mem[1] <= 32'h506213;    // ori x4, x0, 5
+	// inst_mem[2] <= 32'h221293;    // slli x5, x4, 2
+	// inst_mem[2] <= 32'h7CD2B7;    // lui x5 1997
+	// inst_mem[0] <= 32'h00000000; // 0  nop
+	// inst_mem[1] <= 32'h00206413; // 4  ori x8, x0, 2
+	// inst_mem[2] <= 32'h00306493; // 8  ori x9, x0, 3
+	// inst_mem[3] <= 32'h00944463; // 12 blt x8 x9 8 pula duas instrucoes, vai para 24
+	// inst_mem[4] <= 32'h00248413; // 16 addi x8, x9, 2  
+	// inst_mem[5] <= 32'h00548413; // 20 addi x8, x9, 5  
+	// inst_mem[6] <= 32'hfe944ae3; // 24 blt x8 x9 -12 volta duas instrucoes, vai para 16
+	//inst_mem[0] <= 32'h00000000;  // 0  nop
+	//inst_mem[1] <= 32'h00206413;  // 4  ori x8, x0, 2
+	//inst_mem[2] <= 32'h00306493;  // 8  ori x9, x0, 3
+	//inst_mem[3] <= 32'h0084d463;  // 12 bge x9 x8 8 pula duas instrucoes, vai para 24
+	//inst_mem[4] <= 32'h00248413;  // 16 addi x8, x9, 2  
+	//inst_mem[5] <= 32'h00548413;  // 20 addi x8, x9, 5  
+	//inst_mem[6] <= 32'hfe84dae3;  // 24 bge x9 x8 -12 volta duas instrucoes, vai para 16
   end
   
 endmodule
